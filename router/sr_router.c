@@ -64,19 +64,28 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
   /* fill in code here */
 
   /* Need to check if packet is (1) IP packet or (2) ARP reply/request */
-  /* Parse the packet - read ethernet header */
-  struct sr_ethernet_hdr *ethernet_header = (struct sr_ethernet_hdr *) packet;
 
-  /* Read ethernet type - convert it from network byte order to host byte order to ensure host correctly reads bytes regardless of endianness */
-  uint16_t ether_type = ntohs(ethernet_header->ether_type);
-  printf("EtherType is 0x%04x (%d)\n", ether_type, ether_type);
+  /* Print ethernet header */
+  print_hdr_eth(packet);
 
-  /* Read ethernet type */
-  if (ether_type == ethertype_ip) {
-    printf("IP Packet received.\n");
+  /* Determine Ethernet type */
+  uint16_t ethtype = ethertype(packet);
+
+  if (ethtype == ethertype_ip) {
+    printf(">>> IP Packet Received:\n");
+    /* Print IP header */
+    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
+
+    /* TODO: handle this */
   }
-  else if (ether_type == ethertype_arp) {
-    printf("ARP Packet received.\n");
+  
+  else if (ethtype == ethertype_arp) {
+    printf(">>> ARP Packet Received:\n");
+    /* Print ARP header */
+    print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
+
+    /* TODO: handle this */
+
   }
 
 } /* end sr_ForwardPacket */
