@@ -88,7 +88,7 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
       free(sr_arpcache_lookup);  /* free the arp entry */
     }
     else {
-      struct sr_arpreq *sr_arpcache_queuereq = sr_arpcache_queureq(&sr->cache, arp_hdr, packet, len, interface); /* if no MAC address found in cache, put it in queue */
+      struct sr_arpreq *sr_arpcache_queuereq = sr_arpcache_queureq(&sr->cache, arp_hdr->ar_tip, packet, len, interface); /* if no MAC address found in cache, put it in queue */
       handle_arpreq(sr, sr_arpcache_queuereq);
     }
   }
