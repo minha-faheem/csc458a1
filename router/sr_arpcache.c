@@ -17,8 +17,49 @@
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
+
+  You will need to add ARP requests and packets waiting on responses to those ARP requests
+  to the ARP request queue. 
+  When an ARP response arrives, you will have to remove the ARP request from the queue 
+    and place it onto the ARP cache, forwarding any packets that were
+    waiting on that ARP request. 
+  
+  Pseudocode for these operations is provided in sr arpcache.h.
+  The base code already creates a thread that times out ARP cache entries 15 seconds after they
+  are added for you. You must fill out the sr arpcache sweepreqs function in sr arpcache.c
+  that gets called every second to iterate through the ARP request queue and re-send ARP
+  requests if necessary. Pseudocode for this is provided in sr arpcache.h.
+
 */
-void sr_arpcache_sweepreqs(struct sr_instance *sr) { /* Fill this in */ }
+void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
+  /* Fill this in */ 
+
+}
+
+
+void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
+  // Get current time 
+  time_t current_time;
+  time(&current_time);
+
+  double diff_t;
+  diff_t = difftime(current_time, sr_arpreq->sent);
+
+  if (diff_t > 1.0) {
+    if (sr_arpreq->times_sent >= 5) {
+      // Send icmp host unreachable to source addr of all pkts waiting on this request
+      sr_arpreq_destroy(&sr->cache, sr_arpreq);       // destroy arp request
+    }
+    else {
+      // send ARP request
+
+      sr_arpreq->sent = current_time;
+      sr_arpreq->times_sent++;
+    }
+  }
+}
+
+
 
 /* You should not need to touch the rest of this code. */
 

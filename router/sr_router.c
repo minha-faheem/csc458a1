@@ -68,15 +68,12 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
   /* Print ethernet header */
   print_hdr_eth(packet);
 
-  /* Determine Ethernet type */
-  uint16_t ethtype = ethertype(packet);
+  uint16_t ethtype = ethertype(packet);   /* Determine Ethernet type */
 
   if (ethtype == ethertype_ip) {
     printf(">>> IP Packet Received:\n");
-    /* Print IP header */
-    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
-
-    /* TODO: handle this */
+    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));     /* Print IP header */
+    /* TODO: handle IP packets */
   }
   
   else if (ethtype == ethertype_arp) {
@@ -84,8 +81,16 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
     /* Print ARP header */
     print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
 
-    /* TODO: handle this */
-
+    sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);     /* Cast ARP header to retrieve destination IP address */
+    struct sr_arpentry *sr_arpcache_lookup = arpcache_lookup(sr->cache, arp_hdr);   /* Look up MAC address of IP address */
+    if (sr_arpcache_lookup) { /* if MAC address exists */
+      sr_send_packet(sr, packet, len, interface); /* send packet */
+      free(sr_arpcache_lookup);  /* free the arp entry */
+    }
+    else {
+      struct sr_arpreq *sr_arpcache_queuereq = sr_arpcache_queureq(&sr->cache, arp_hdr, packet, len, interface); /* if no MAC address found in cache, put it in queue */
+      handle_arpreq(sr, sr_arpcache_queuereq);
+    }
   }
 
 } /* end sr_ForwardPacket */
