@@ -33,7 +33,7 @@
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
   /* Fill this in */ 
-  for (struct sr_arpreq *req = sr->cache.requests; req != NULL; ) {
+  for (struct sr_arpreq *req = sr->cache.requests; req != NULL;) {
     struct sr_arpreq *next_req = req->next; /* save the next pointer before calling handle_arpreq*/
     handle_arpreq(sr, req);
     req = next_req;
