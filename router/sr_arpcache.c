@@ -33,16 +33,16 @@
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
   /* Fill this in */ 
-  for (struct sr_arpreq *req = sr->cache.requests; req != NULL;) {
-    struct sr_arpreq *next_req = req->next; /* save the next pointer before calling handle_arpreq*/
-    handle_arpreq(sr, req);
-    req = next_req;
-  }
+  /* for (struct sr_arpreq *req = sr->cache.requests; req != NULL;) { */
+    /* struct sr_arpreq *next_req = req->next; save the next pointer before calling handle_arpreq */
+    /* handle_arpreq(sr, req); */
+    /* req = next_req; */
+  /* } */
 }
 
 
 void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
-  // Get current time 
+  /* Get current time */ 
   time_t current_time;
   time(&current_time);
 
@@ -51,11 +51,11 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
 
   if (diff_t > 1.0) {
     if (sr_arpreq->times_sent >= 5) {
-      // Send icmp host unreachable to source addr of all pkts waiting on this request
-      sr_arpreq_destroy(&sr->cache, sr_arpreq);       // destroy arp request
+      /* Send icmp host unreachable to source addr of all pkts waiting on this request */
+      sr_arpreq_destroy(&sr->cache, sr_arpreq);       /* destroy arp request */
     }
     else {
-      // send ARP request
+      /* send ARP request */
       sr_arpreq->sent = current_time;
       sr_arpreq->times_sent++;
     }
