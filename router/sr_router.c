@@ -72,21 +72,51 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
     return -1;
   }
 
-  uint8_t *copy = malloc(len);          /* Make copy of packet */
+  uint8_t *copy = malloc(len);            /* Make copy of packet to use in helper functions */
   if (!copy) {
       fprintf(stderr, "MALLOC ERROR in sr_handlepacket\n");
       return;
   }
   memcpy(copy, packet, len);
 
-  print_hdr_eth(copy);                    /* Print Ethernet header */
-  uint16_t ethtype = ethertype(copy);     /* Determine Ethernet type */
+  print_hdr_eth(packet);                    /* Print Ethernet header */
+  uint16_t ethtype = ethertype(packet);     /* Determine Ethernet type */
 
   if (ethtype == ethertype_ip) {          /* If packet is IP packet */
     printf(">>> IP Packet Received:\n");
-    print_hdr_ip(copy + sizeof(sr_ethernet_hdr_t));
-    handle_ip_packet();
+    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
 
+    sr_ip_hdr_t *ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+
+    /* An incoming IP packet may be destined for (1) one of your router’s IP addresses, 
+    (2) or it may be destined elsewhere. 
+    
+    If it is sent to one of your router’s IP addresses, you should take the following actions */
+    /* IF Router is meant for our Router's IP addresses, then check: */
+    /* 1. If the packet is an ICMP echo request and its checksum is valid, send an ICMP echo reply to the sending host.*/
+    /* Create a function, handle_icmp_echo request() */
+    /* 2. If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host.*/
+    /* Create a function, handle_icmp_echo_request() */
+    /* 3. Otherwise, ignore the packet */
+
+
+    /* ELSE if packet is destined elsewhere, */
+    /* 4. But, packets destined elsewhere should be forwarded using normal fowarding logic */
+    /* Create a function, forward_ip_packet() */
+
+
+    struct sr_if *iface_entry = sr->if_list;
+    while(iface_entry != NULL) {
+      /* Look for the matching interface from list of interfaces */
+      if (iface_entry->ip == ip_header->ip_dst) {
+        /* Case 1: If packet is meant for our router's IP addresses */
+        handle_ip_packet(sr, copy, len, iface_entry); 
+        return;
+      }
+      iface_entry = iface_entry->next;
+    }
+    /* Case 2: If packet is destined elsewhere */
+    forward_ip_packet(sr, copy, len);
   }
   
   else if (ethtype == ethertype_arp) {                               /* If packet is ARP reply/request */
@@ -121,6 +151,35 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
   }
   free(copy);
 } /* end sr_ForwardPacket */
+
+void handle_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *matching_interface) {
+  /* FOR IP PACKETS DESTINED TO OUR ROUTER */
+  
+  /* Cast the header */
+  sr_ip_hdr_t *ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+  
+
+
+}
+
+void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len) {
+  /* FOR IP PACKETS DESTINED ELSEWHERE */
+
+  /* Sanity-check the packet (meets minimum length and has correct checksum). 
+  If a packet is malformed, the router should silently drop it. */
+  if (len < sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)) { 
+    fprintf(stderr, "** Error: packet is wayy to short \n");
+    return -1;
+  }
+
+  uint16_t checksum = ip_header->ip_sum;
+  ip_header->ip_sum = 0;
+  if (checksum != cksum(ip_header, sizeof(sr_ip_hdr_t))) {
+      fprintf(stderr, "** Error: this IP packet has incorrect checksum \n");
+      return -1;
+  }
+}
+
 
 
 void handle_arp_request(struct sr_instance *sr, uint8_t *packet, struct sr_if *matching_interface) {
