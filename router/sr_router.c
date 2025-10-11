@@ -170,6 +170,7 @@ void handle_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len,
     return;
   }
 
+  
   /* Check if packet is ICMP echo request */
   if (ip_header->ip_p == ip_protocol_icmp) {
     /* Cast the ICMP Header */
