@@ -68,6 +68,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
         fprintf(stderr, ">>> ERROR: handle_arpreq() No interface found for ARP resend.\n");
         return;
       }
+      
       /* If interface found, construct the ARP request */
       /* send ARP request - similar to handle_arp_request in sr_router.c */
       unsigned int arp_packet_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
@@ -76,16 +77,16 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
           fprintf(stderr, ">>> ERROR: handle_arpreq() malloc error when creating ARP reply.\n");
           return;
       }
-      /* Construct Ethernet and ARP headers */
+
+      /* Construct Ethernet header*/
       sr_ethernet_hdr_t *ethernet_header = (sr_ethernet_hdr_t *)arp_packet;
-      sr_arp_hdr_t *arp_header = (sr_arp_hdr_t *)(arp_packet + sizeof(sr_ethernet_hdr_t));
-      
       /* Broadcast this packet */
       memset(ethernet_header->ether_dhost, 0xFF, ETHER_ADDR_LEN); /* Broadcast */
       memcpy(ethernet_header->ether_shost, outgoing_interface->addr, ETHER_ADDR_LEN);
       ethernet_header->ether_type = htons(ethertype_arp);
       
-      /* */
+      /* Construct ARP header */
+      sr_arp_hdr_t *arp_header = (sr_arp_hdr_t *)(arp_packet + sizeof(sr_ethernet_hdr_t));
       arp_header->ar_hrd = htons(arp_hrd_ethernet);
       arp_header->ar_pro = htons(ethertype_ip);
       arp_header->ar_hln = ETHER_ADDR_LEN;
@@ -93,7 +94,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
       arp_header->ar_op  = htons(arp_op_request);
       memcpy(arp_header->ar_sha, outgoing_interface->addr, ETHER_ADDR_LEN);
       arp_header->ar_sip = outgoing_interface->ip;
-      memset(arp_header->ar_tha, 0x00, ETHER_ADDR_LEN);
+      memset(arp_header->ar_tha, 0x00, ETHER_ADDR_LEN);   /* Don't know target MAC address yet, filling it with zeroes */
       arp_header->ar_tip = sr_arpreq->ip;
 
       /* Send the packet forward */
