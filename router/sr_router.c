@@ -210,7 +210,6 @@ void handle_icmp_messages(struct sr_instance *sr, uint8_t *packet, unsigned int 
   if (icmp_type == 0 && icmp_code == 0) {
     sr_icmp_hdr_t *new_icmp_header = (sr_icmp_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
     memcpy(new_icmp_header, original_icmp_header, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
-
     new_icmp_header->icmp_type = 0;
     new_icmp_header->icmp_code = 0;
     new_icmp_header->icmp_sum = 0;
@@ -220,7 +219,6 @@ void handle_icmp_messages(struct sr_instance *sr, uint8_t *packet, unsigned int 
   /* For ERROR MESSAGES - Type 3 or 11 */
   else {
   sr_icmp_t3_hdr_t *new_icmp_header = (sr_icmp_t3_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-  
   new_icmp_header->icmp_type = icmp_type;
   new_icmp_header->icmp_code = icmp_code;
   new_icmp_header->unused = 0;
