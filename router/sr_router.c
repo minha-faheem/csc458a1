@@ -114,7 +114,7 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
       iface_entry = iface_entry->next;
     }
     /* Case 2: If packet is destined elsewhere */
-    forward_ip_packet(sr, packet_copy, len);
+    forward_ip_packet(sr, packet_copy, len, iface_entry);
   }
   
   else if (ethtype == ethertype_arp) {                               /* If packet is ARP reply/request */
@@ -151,6 +151,93 @@ void sr_handlepacket(struct sr_instance *sr, uint8_t *packet /* lent */,
 } /* end sr_ForwardPacket */
 
 
+/* The source address of an ICMP message can be the source address of any of the incoming
+interfaces, as specified in RFC 792. The only incoming ICMP message 
+destined towards the router’s IPs that you have to explicitly process are ICMP echo requests */
+void handle_icmp_messages(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint8_t icmp_type, uint8_t icmp_code) {
+  /* 1. Determine total length of new packet to allocate space for it */
+  unsigned int icmp_len;
+  if (icmp_type == 0) {
+    /* Echo Reply - should have same total size as original */
+    icmp_len = len;
+  } else {
+    /* Error message - Destination unreachable, Time exceeded */
+    icmp_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+  }
+  uint8_t *icmp_packet = malloc(icmp_len);
+  memset(icmp_packet, 0, icmp_len);
+
+  /* 2. Build the Ethernet header */
+  sr_ethernet_hdr_t *original_ethernet_header = (sr_ethernet_hdr_t *)packet;
+  sr_ethernet_hdr_t *new_ethernet_header = (sr_ethernet_hdr_t *)icmp_packet;
+
+  /* Swap source and destination MAC addresses since we are sending it back */
+  memcpy(new_ethernet_header->ether_dhost, original_ethernet_header->ether_shost, ETHER_ADDR_LEN);
+  memcpy(new_ethernet_header->ether_shost, outgoing_interface->addr, ETHER_ADDR_LEN);
+  /* Set ethertype to IP */
+  new_ethernet_header->ether_type = htons(ethertype_ip);
+
+  /* 3. Build the IP header */
+  sr_ip_hdr_t *original_ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+  sr_ip_hdr_t *new_ip_header = (sr_ip_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t));
+
+  /* Some values are taken from link in assignment handout: https://www.ietf.org/rfc/rfc792.txt */
+  new_ip_header->ip_v = 4;
+  new_ip_header->ip_hl = 5;
+  new_ip_header->ip_ttl = 64;
+  new_ip_header->ip_p = ip_protocol_icmp;
+  new_ip_header->ip_sum = 0;
+  new_ip_header->ip_off = htons(IP_DF);
+  new_ip_header->ip_tos = 0;
+  new_ip_header->ip_src = outgoing_interface->ip;   /* IP packet coming from router */
+  new_ip_header->ip_dst = original_ip_header->ip_src; /* back to the original sender */
+
+  /* 4. Set IP total length */
+  if (icmp_type == 0 && icmp_code == 0) {
+    /* Echo reply - same size */
+    new_ip_header->ip_len = original_ip_header->ip_len;
+  }
+  else {
+    new_ip_header->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+  }
+  /* Compute checksum */
+  new_ip_header->ip_sum = cksum(new_ip_header, sizeof(sr_ip_hdr_t));
+
+  /* 5. Build ICMP header - depends on the icmp type */
+  sr_icmp_hdr_t *original_icmp_header = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+  /* For ECHO REPLY - Type 0 */
+  if (icmp_type == 0 && icmp_code == 0) {
+    sr_icmp_hdr_t *new_icmp_header = (sr_icmp_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+    memcpy(new_icmp_header, original_icmp_header, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
+
+    new_icmp_header->icmp_type = 0;
+    new_icmp_header->icmp_code = 0;
+    new_icmp_header->icmp_sum = 0;
+    new_icmp_header->icmp_sum = cksum(new_icmp_header, len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t));
+  }
+
+  /* For ERROR MESSAGES - Type 3 or 11 */
+  else {
+  sr_icmp_t3_hdr_t *new_icmp_header = (sr_icmp_t3_hdr_t *)(icmp_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+  
+  new_icmp_header->icmp_type = icmp_type;
+  new_icmp_header->icmp_code = icmp_code;
+  new_icmp_header->unused = 0;
+  new_icmp_header->next_mtu = 0;
+  
+  /* Copy original IP header + first 8 bytes of data */
+  memcpy(new_icmp_header->data, packet + sizeof(sr_ethernet_hdr_t), sizeof(sr_ip_hdr_t) + 8);
+  new_icmp_header->icmp_sum = 0;
+  new_icmp_header->icmp_sum = cksum(new_icmp_header, sizeof(sr_icmp_t3_hdr_t));
+  }
+
+  /* Send the new ICMP packet */
+  sr_send_packet(sr, icmp_packet, icmp_len, outgoing_interface->name);
+  free(icmp_packet);
+}
+
+
 void handle_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *matching_interface) {
   /* FOR IP PACKETS DESTINED TO OUR ROUTER */
   
@@ -170,26 +257,25 @@ void handle_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len,
     return;
   }
 
-  
   /* Check if packet is ICMP echo request */
   if (ip_header->ip_p == ip_protocol_icmp) {
     /* Cast the ICMP Header */
     sr_icmp_hdr_t *icmp_header = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
-    /* TODO: How do I know which one is ICMP echo request and TCP/UDP message? */
+    /* ICMP Echo Request = ICMP type 8 */
     if (icmp_header->icmp_type == 8) {
       /* If echo request, send along */
-      handle_icmp_messages();
+      handle_icmp_messages(sr, packet, len, matching_interface, 0, 0);
     }
-
-  /* If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host. */
-  else {
-    handle_icmp_messages();
-  }
+    /* If the packet contains a TCP or UDP payload, send an ICMP port unreachable to the sending host. */
+    else if (ip_header->ip_p == 6 || ip_header->ip_p == 17) {
+      handle_icmp_messages(sr, packet, len, matching_interface, 3, 3);
+    }
   /* Otherwise, ignore the packet */
+  }
 }
 
-void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len) {
+void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *matching_interface) {
   /* FOR IP PACKETS DESTINED ELSEWHERE */
 
   /* If an error occurs in any of the steps, you will have to send an ICMP
@@ -210,7 +296,7 @@ void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
   ip_header->ip_ttl--;
   if (ip_header->ip_ttl == 0) {
     /* If TTL = 0, send ICMP message time exceeded }*/
-    handle_icmp_messages();
+    handle_icmp_messages(sr, packet, len, matching_interface, 11, 0);
   }
   /* Recompute the packet checksum over the modified header */
   ip_header->ip_sum = 0;
@@ -237,10 +323,10 @@ void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
     rt_entry = rt_entry->next;
   }
 
-  /* If no LPM found, send ICMP message */
+  /* If no LPM found, send ICMP message Destination net unreachable - a non-existent route to the destination IP  */
   if (!best_match_entry) {
     fprintf(stderr, ">>> ERROR: forward_ip_packet() No matching prefix found.\n");
-    handle_icmp_messages();
+    handle_icmp_messages(sr, packet, len, matching_interface, 3, 0);
     return;
   }
 
@@ -269,10 +355,6 @@ void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
     struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, next_hop_ip, packet, len, best_match_entry->interface);
     handle_arpreq(arp_request, sr);
   }
-}
-
-void handle_icmp_messages() {
-  return;
 }
 
 
