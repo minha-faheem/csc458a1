@@ -351,7 +351,7 @@ void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
   and add the packet to the queue of packets waiting on this ARP request. */
   else {
     struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, next_hop_ip, packet, len, best_match_entry->interface);
-    handle_arpreq(arp_request, sr);
+    handle_arpreq(sr, arp_request);
   }
 }
 
@@ -426,21 +426,3 @@ void handle_arp_reply(struct sr_instance *sr, uint8_t *packet, struct sr_if *mat
   }
   /* free(packet); */
 }
-
-
-
-void sr_ForwardPacket(struct sr_instance *sr, uint8_t *packet /* lent */,
-                     unsigned int len, char *interface /* lent */){
-                      
-  sr_arp_hdr_t *arp_header = (sr_arp_hdr_t *)(packet);     /* Cast ARP header to retrieve destination IP address */
-  /* sr_ip_hdr_t *ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t)); */
-  struct sr_arpentry *entry = sr_arpcache_lookup(&sr->cache, arp_header); /* Look up MAC address of IP address */
-  if (sr_arpcache_lookup) { /* if MAC address exists */
-    sr_send_packet(sr, packet, len, interface); /* send packet */
-    free(sr_arpcache_lookup);  /* free the arp entry */
-  }
-  else {
-    struct sr_arpreq *sr_arpcache_queuereq = sr_arpcache_queureq(&sr->cache, arp_header->ar_tip, packet, len, interface); /* if no MAC address found in cache, put it in queue */
-    handle_arpreq(sr, sr_arpcache_queuereq);
-  }
-} /* end sr_ForwardPacket */
