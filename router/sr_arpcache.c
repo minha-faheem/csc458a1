@@ -59,6 +59,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
       while(queued_packet) {
         struct sr_if *outgoing_interface = sr_get_interface(sr, queued_packet->iface);
         if (outgoing_interface) {
+          printf(">>> ICMP ERROR MESSAGE: DESTINATION HOST UNREACHABLE.\n");
           handle_icmp_messages(sr, queued_packet->buf, queued_packet->len, outgoing_interface, 3, 1);
         }
         queued_packet = queued_packet->next;
