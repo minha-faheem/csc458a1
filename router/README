@@ -1,0 +1,48 @@
+# CSC458 ASSIGNMENT 1
+
+This is my implementation of a simple router based on the requirements of Assignment 1. 
+
+
+## My Functions
+
+### Packet Handling: IP Packets +  ICMP Messages
+
+- [`sr_handlepacket`](router/sr_router.c):  
+  Main entry point for all packets received by the router. Dispatches to IP or ARP handlers.
+
+- [`handle_ip_packet`](router/sr_router.c):  
+  Handles IP packets destined for the router, including ICMP echo requests and TCP/UDP port unreachable errors.
+
+- [`forward_ip_packet`](router/sr_router.c):  
+  Forwards IP packets to the next hop, performing ARP lookup and queueing if necessary.
+
+- [`handle_icmp_messages`](router/sr_router.c):  
+  Constructs and sends ICMP error and echo reply messages.
+
+### ARP Handling
+
+- [`handle_arp_request`](router/sr_router.c):  
+  Responds to ARP requests for the router's own IP addresses.
+
+- [`handle_arp_reply`](router/sr_router.c):  
+  Processes ARP replies, updates the ARP cache, and sends queued packets.
+
+### ARP Cache Management
+
+- [`sr_arpcache_sweepreqs`](router/sr_arpcache.c):  
+  Periodically sweeps the ARP request queue, resending requests or sending ICMP host unreachable after 5 attempts.
+
+- [`handle_arpreq`](router/sr_arpcache.c):  
+  Handles individual ARP requests: resends or times out as appropriate.
+
+
+## Files modified 
+
+- [`sr_router.c`](router/sr_router.c) 
+- [`sr_router.h`](router/sr_router.h)
+- [`sr_arpcache.c`](router/sr_arpcache.c)
+- [`sr_arpcache.h`](router/sr_arpcache.h)
+
+---
+
+For further implementation details, please see my comments in each function.
