@@ -49,12 +49,14 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
   time_t current_time;
   time(&current_time);
 
+  /* Calculate time difference since the last ARP request was sent */
   double diff_t;
   diff_t = difftime(current_time, sr_arpreq->sent);
 
+  /* Check if it has been more than 1 second since last ARP request */
   if (diff_t > 1.0) {
+    /* If 5 ARP requests already sent, send icmp host unreachable to source addr of all pkts waiting on this request */
     if (sr_arpreq->times_sent >= 5) {
-      /* Send icmp host unreachable to source addr of all pkts waiting on this request */
       struct sr_packet *queued_packet = sr_arpreq->packets;
       while(queued_packet) {
         struct sr_if *outgoing_interface = sr_get_interface(sr, queued_packet->iface);
@@ -64,9 +66,10 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
         }
         queued_packet = queued_packet->next;
       }
-      sr_arpreq_destroy(&sr->cache, sr_arpreq);       /* destroy arp request */
+      sr_arpreq_destroy(&sr->cache, sr_arpreq);       /* Destroy ARP request */
     }
     else {
+      /* If less than ARP requests sent, resend the ARP request */
       struct sr_if *outgoing_interface = sr_get_interface(sr, sr_arpreq->packets->iface);
       if (!outgoing_interface) {
         fprintf(stderr, ">>> ERROR: handle_arpreq() No interface found for ARP resend.\n");
@@ -74,7 +77,7 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
       }
       
       /* If interface found, construct the ARP request */
-      /* send ARP request - similar to handle_arp_request in sr_router.c */
+      /* Send ARP request - similar to handle_arp_request() in sr_router.c */
       unsigned int arp_packet_len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
       uint8_t *arp_packet = malloc(arp_packet_len);
       if (!arp_packet) {
@@ -84,9 +87,11 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
 
       /* Construct Ethernet header*/
       sr_ethernet_hdr_t *ethernet_header = (sr_ethernet_hdr_t *)arp_packet;
-      /* Broadcast this packet */
-      memset(ethernet_header->ether_dhost, 0xFF, ETHER_ADDR_LEN); /* Broadcast */
+      /* Broadcast this MAC address */
+      memset(ethernet_header->ether_dhost, 0xFF, ETHER_ADDR_LEN);
+      /* Set source MAC to the outgoing interface MAC */
       memcpy(ethernet_header->ether_shost, outgoing_interface->addr, ETHER_ADDR_LEN);
+      /* Set ethernet type for ARP */
       ethernet_header->ether_type = htons(ethertype_arp);
       
       /* Construct ARP header */
@@ -98,10 +103,10 @@ void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq) {
       arp_header->ar_op  = htons(arp_op_request);
       memcpy(arp_header->ar_sha, outgoing_interface->addr, ETHER_ADDR_LEN);
       arp_header->ar_sip = outgoing_interface->ip;
-      memset(arp_header->ar_tha, 0x00, ETHER_ADDR_LEN);   /* Don't know target MAC address yet, filling it with zeroes */
+      memset(arp_header->ar_tha, 0x00, ETHER_ADDR_LEN);   /* Don't know target MAC address yet */
       arp_header->ar_tip = sr_arpreq->ip;
 
-      /* Send the packet forward */
+      /* Send the packet forward to interface */
       sr_send_packet(sr, arp_packet, arp_packet_len, outgoing_interface->name);
       free(arp_packet);
 
