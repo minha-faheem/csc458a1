@@ -369,8 +369,16 @@ void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len
   }
   
   /* If LPM found, check the ARP cache for the next-hop MAC address corresponding to the next-hop IP. */
-  uint32_t next_hop_ip = best_match_entry->gw.s_addr;
-  /* uint32_t next_hop_ip = (best_match_entry->gw.s_addr == 0) ? ip_header->ip_dst : best_match_entry->gw.s_addr; */
+  /* uint32_t next_hop_ip = best_match_entry->gw.s_addr; */
+  uint32_t next_hop_ip;
+  /* If the destination host is directly reachable on this interface, send it to the frame's MAC address */
+  if (best_match_entry->gw.s_addr == 0) {
+      next_hop_ip = ip_header->ip_dst; 
+  } 
+  /* Else, send it to the gateway address */
+  else {
+      next_hop_ip = best_match_entry->gw.s_addr; 
+  }
   
   /* If it’s there, send it. */
   struct sr_arpentry *its_there = sr_arpcache_lookup(&sr->cache, next_hop_ip);
