@@ -114,9 +114,9 @@ struct sr_ethernet_hdr {
 #ifndef ETHER_ADDR_LEN
 #define ETHER_ADDR_LEN 6
 #endif
-  uint8_t ether_dhost[ETHER_ADDR_LEN]; /* destination ethernet address */
-  uint8_t ether_shost[ETHER_ADDR_LEN]; /* source ethernet address */
-  uint16_t ether_type;                 /* packet type ID */
+  uint8_t ether_dhost[ETHER_ADDR_LEN]; /* destination ethernet address - DESTINATION MAC ADDRESS */
+  uint8_t ether_shost[ETHER_ADDR_LEN]; /* source ethernet address - SOURCE MAC ADDRESS */
+  uint16_t ether_type;                 /* packet type ID - Type field for IP vs. ARP ethernet packet types */
 } __attribute__((packed));
 typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 

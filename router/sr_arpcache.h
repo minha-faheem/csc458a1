@@ -1,7 +1,10 @@
-/* This file defines an ARP cache, which is made of two structures: an ARP
-   request queue, and ARP cache entries. The ARP request queue holds data about
+/* This file defines an ARP cache, which is made of two structures: 
+an ARP request queue, and ARP cache entries. 
+   The ARP request queue holds data about
    an outgoing ARP cache request and the packets that are waiting on a reply
-   to that ARP cache request. The ARP cache entries hold IP->MAC mappings and
+   to that ARP cache request. 
+   
+   The ARP cache entries hold IP->MAC mappings and 
    are timed out every SR_ARPCACHE_TO seconds.
 
    Pseudocode for use of these structures follows.
@@ -9,13 +12,13 @@
    --
 
    # When sending packet to next_hop_ip
-   entry = arpcache_lookup(next_hop_ip)
+   entry = arpcache_lookup(next_hop_ip) // checks the cache for the MAC address of a packet's destination 
 
-   if entry:
+   if entry: // if MAC address exists in the cache
        use next_hop_ip->mac mapping in entry to send the packet
        free entry
    else:
-       req = arpcache_queuereq(next_hop_ip, packet, len)
+       req = arpcache_queuereq(next_hop_ip, packet, len) // if no MAC address found in cache, put it in queue
        handle_arpreq(req)
 
    --
@@ -144,5 +147,9 @@ void sr_arpcache_dump(struct sr_arpcache *cache);
 int sr_arpcache_init(struct sr_arpcache *cache);
 int sr_arpcache_destroy(struct sr_arpcache *cache);
 void *sr_arpcache_timeout(void *cache_ptr);
+
+/* MY METHODS */
+void sr_arpcache_sweepreqs(struct sr_instance *sr);
+void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *sr_arpreq);
 
 #endif

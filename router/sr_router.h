@@ -68,6 +68,12 @@ int sr_read_from_server(struct sr_instance *);
 /* -- sr_router.c -- */
 void sr_init(struct sr_instance *);
 void sr_handlepacket(struct sr_instance *, uint8_t *, unsigned int, char *);
+/* MY HELPER FUNCTIONS */
+void handle_icmp_messages(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *outgoing_interface, uint8_t icmp_type, uint8_t icmp_code);
+void handle_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *matching_interface);
+void forward_ip_packet(struct sr_instance *sr, uint8_t *packet, unsigned int len, struct sr_if *source_interface);
+void handle_arp_request(struct sr_instance *sr, uint8_t *packet, struct sr_if *matching_interface);
+void handle_arp_reply(struct sr_instance *sr, uint8_t *packet, struct sr_if *matching_interface);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance *, const char *);
